@@ -1,10 +1,22 @@
-import { useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useGetMe } from "@workspace/api-client-react";
+import { queryClient } from "@/lib/queryClient";
 
-export function useAuth() {
+interface AuthContextValue {
+  user: ReturnType<typeof useGetMe>["data"];
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  isAdmin: boolean;
+  login: (token: string) => void;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(localStorage.getItem("ttm_token"));
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
 
   const { data: user, isLoading, error } = useGetMe({
     query: {
@@ -13,7 +25,6 @@ export function useAuth() {
     }
   });
 
-  // Clear token on auth error (expired / invalid)
   useEffect(() => {
     if (error) {
       localStorage.removeItem("ttm_token");
@@ -23,31 +34,35 @@ export function useAuth() {
 
   const isAuthenticated = !!user && !!token;
 
-  // Redirect to dashboard once authenticated (handles post-login navigation)
-  useEffect(() => {
-    if (isAuthenticated && (location === "/" || location === "/signup")) {
-      setLocation("/dashboard");
-    }
-  }, [isAuthenticated, location, setLocation]);
-
   const login = useCallback((newToken: string) => {
     localStorage.setItem("ttm_token", newToken);
     setToken(newToken);
-    // Navigation is handled by the useEffect above once isAuthenticated becomes true
-  }, []);
+    setLocation("/dashboard");
+  }, [setLocation]);
 
   const logout = useCallback(() => {
     localStorage.removeItem("ttm_token");
     setToken(null);
+    queryClient.removeQueries();
     setLocation("/");
   }, [setLocation]);
 
-  return {
-    user,
-    isLoading: isLoading && !!token,
-    isAuthenticated,
-    login,
-    logout,
-    isAdmin: user?.role === "admin",
-  };
+  return (
+    <AuthContext.Provider value={{
+      user,
+      isLoading: isLoading && !!token,
+      isAuthenticated,
+      isAdmin: user?.role === "admin",
+      login,
+      logout,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
 }
