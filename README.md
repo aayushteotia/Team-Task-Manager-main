@@ -196,6 +196,26 @@ pnpm --filter @workspace/db exec drizzle-kit studio --config ./drizzle.config.ts
 
 Then open **https://local.drizzle.studio** in your browser.
 
+## Deploying to Railway
+
+This repository is ready to deploy to Railway using the root `Dockerfile`.
+
+1. Provision a PostgreSQL database in Railway.
+2. Set these Railway environment variables:
+   - `DATABASE_URL`
+   - `JWT_SECRET`
+   - `PORT` = `8080`
+   - `NODE_ENV` = `production`
+3. Connect your GitHub repository to Railway and let Railway detect the Dockerfile.
+4. Railway will build the container and start the app using the backend service.
+5. After deployment, run the database migration from Railway shell or locally:
+
+```bash
+pnpm --filter @workspace/db run push
+```
+
+The backend serves both the API and the built frontend, so the application will be available from the Railway service URL.
+
 ---
 
 ## Scripts
